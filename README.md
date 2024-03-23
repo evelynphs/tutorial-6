@@ -69,3 +69,78 @@ Ketika program di-run dan `http://127.0.0.1:7878/` dibuka pada browser, akan mun
 ![Commit 2 screen capture](/assets/images/commit2.png)
 
 ---
+
+### Commit 3 Reflection notes
+#### Validating request and selectively responding
+
+Pada commit sebelumnya, program mengabaikan isi request pada `http_request` dan selalu me-return `hello.html` pada kondisi apapun. Kali ini, kita menerapkan request validation dan selective responding agar program me-return response yang sesuai dengan isi request. Program dibuat agar me-return `hello.html` ketika mendapat request path `/` dan me-return error page ketika mendapat request lainnya. Method `handle_connection` dimodifikasi sebagai berikut.
+
+<br>
+
+```rust
+let request_line = buf_reader.lines().next().unwrap().unwrap();
+```
+Variabel `http_response` diganti dengan variabel `request_line` yang berisi baris pertama dari hasil pembacaan `buf_reader`. Hal ini dilakukan karena kita hanya memerlukan baris pertama dari request untuk validasi. `buf_reader.lines().next().unwrap().unwrap()` digunakan untuk meng-unwrap item pertama dari iterator, kemudian meng-unwrap lagi hasil iterasi tersebut menjadi string.
+
+<br>
+
+```rust
+if request_line == "GET / HTTP/1.1" {
+    let status_line = "HTTP/1.1 200 OK";
+    let contents = fs::read_to_string("hello.html").unwrap();
+    let length = contents.len();
+    let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
+
+    stream.write_all(response.as_bytes()).unwrap();
+}
+```
+Penyusunan dan pengiriman response dipindahkan ke dalam suatu blok `if`. Blok tersebut memeriksa apakah `request_line` berisi request GET dengan path `/`. Penyusunan dan pengiriman response `hello.html` hanya akan dijalankan jika `reuest_line` nya sesuai.
+
+<br>
+
+```rust
+else {
+    let status_line = "HTTP/1.1 404 NOT FOUND";
+    let contents = fs::read_to_string("404.html").unwrap();
+    let length = contents.len();
+
+    let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
+
+    stream.write_all(response.as_bytes()).unwrap();
+}
+```
+Ditambahkan suatu blok `else` yang akan meng-handle response jika request yang diterima BUKAN `GET /`. Pada blok ini, `status_line` akan mengirimkan status code `400` dan reason phrase `NOT FOUND`, sedangkan `content` akan berisi hasil pembacaan `404.html`. Response ini menandakan bahwa terjadi error karena penerimaan request yang dianggap _unknown_.
+
+<br>
+
+Kini, program sudah bisa memvalidasi request dan mengirimkan response yang berbeda sesuai dengan request yang didapat. Tetapi, kode yang dibuat masih memiliki kekurangan. Masih terdapat beberapa duplikasi kode pada bagian blok `if` dan `else`. Isi dari kedua blok tersebut hampir sama persis, perbedaan hanya terletak pada `status_line` dan `contents`. Perlu dilakukan refactoring agar penulisan kode menjadi lebih ringkas. Refactoring dilakukan dengan memodifikasi `handle_connection` menjadi sebagai berikut.
+
+<br>
+
+```rust
+fn handle_connection(mut stream: TcpStream){
+    let buf_reader = BufReader::new(&mut stream);
+    let request_line = buf_reader.lines().next().unwrap().unwrap();
+
+    let (status_line, filename) = if request_line == "GET / HTTP/1.1" {
+        ("HTTP/1.1 200 OK", "hello.html")
+    }
+    else{
+        ("HTTP/1.1 400 NOT FOUND", "404.html")
+    };
+
+    let contents = fs::read_to_string(filename).unwrap();
+    let length = contents.len();
+    let response = format!("{status_line}\r\nContent-length: {length}\r\n\r\n{contents}");
+
+    stream.write_all(response.as_bytes()).unwrap();
+}
+```
+Pada kode di atas, blok `if` dan `else` hanya bertugas menentukan isi dari variabel `status_line` dan `filename` sesuai dengan `request_line` yang didapat. Penyusunan dan pengiriman response kini dilakukan di luar scope blok `if` dan `else` tersebut. Variabel `content` kini bergantung pada variabel `filename` yang sudah dideklarasikan pada validasi request. Dengan begitu, tidak ada duplikasi kode sehingga penulisan menjadi lebih ringkas.
+
+<br>
+
+Berikut tampilan browser ketika program di-run dan path request invalid, misalnya `http://127.0.0.1:7878/bad`
+![Commit 3 screen capture](/assets/images/commit3.png)
+
+---
