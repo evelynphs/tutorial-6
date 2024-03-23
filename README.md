@@ -34,3 +34,38 @@ println!("Request: {:#?}", http_request);
 Hasil dari kumpulan string dalam vector `http_request` tadi di-print.
 
 ---
+
+### Commit 2 Reflection notes
+#### Return HTML
+
+Pada commit kali ini, kita menambahkan `fs` pada `use` untuk mengimport library filesystem yang nantinya digunakan untuk membaca file `hello.html`. Kemudian, kita memodifikasi method `handle_connection` agar dapat memunculkan response berupa halaman HTML.
+
+<br>
+
+```rust
+    let status_line = "HTTP/1.1 200 OK";
+    let contents = fs::read_to_string("hello.html").unwrap();
+    let length = contents.len();
+```
+Ketiga variabel ini ditambahkan untuk nantinya di-include pada response. Variabel `status_line` berisi versi HTTP `HTTP/1.1`, status code `200`, dan reason phrase `OK`. Variabel `contents` berisi konten `hello.html` yang dibaca menggunakan `fs` dan kemudian di-unwrap menjadi string. Terakhir, variabel `length` berisi length dari variabel `contents`.
+
+<br>
+
+```rust
+    let response = format!("{status_line}\r\nContent-length: {length}\r\n\r\n{contents}");
+```
+Response kemudian disusun menggunakan `format!` untuk meng-include `contents` sebagai isi dari _response body_. Pada response ini, content-length ditambahkan pada header untuk mengatur length dari _response body_ yang diinginkan. Karena kita ingin seluruh isi dari `hello.html` untuk diikutkan pada _response body_, maka isi dari content-length adalah variable `contents` yang sudah menyesuaikan value nya dengan length dari `hello.html`.
+
+<br>
+
+```rust
+    stream.write_all(response.as_bytes()).unwrap();
+```
+String response akan di-convert menjadi _byte_ menggunakan `as_bytes()` dan kemudian dikirimkan melalui stream oleh `write_all` sebagai response ke client.
+
+<br>
+
+Ketika program di-run dan `http://127.0.0.1:7878/` dibuka pada browser, akan muncul tampilan berikut.
+![Commit 2 screen capture](/assets/images/commit2.png)
+
+---
