@@ -173,3 +173,16 @@ Validasi request kini menggunakan `match` untuk mencocokkan _pattern_ dari `requ
 Simulasi dilakukan dengan membuka dua tab, satunya untuk path `/` dan yang satunya lagi untuk path `/sleep`. Ketika browser hanya me-load tab dengan path `/`, tab tersebut dapat di-load dengan sangat cepat. Tetapi, ketika me-load tab dengan path `/sleep`, browser membutuhkan waktu 5 detik sebelum memunculkan `hello.html`. Ketika tab `/sleep` di-load terlebih dahulu, kemudian tab `/` ikut di-load sebelum tab `/sleep` menyelesaikan load nya, tab `/` harus menunggu sampai tab `/sleep` menyelesaikan load nya yang berdurasi 5 detik. Akibat tab `/sleep` yang lebih _slow_ dibanding tab `/`, loading untuk tab `/` ikut terpengaruh dan terjeda. Simulasi ini menunjukkan bahwa pemrosesan pada _single-threaded server_ kurang efisien dan akan sangat memakan waktu ketika diakses oleh banyak client.
 
 ---
+
+### Commit 5 Reflection notes
+#### Creating a multithreaded server
+
+Multithreaded server pada program ini diimplementasikan menggunakan ThreadPool, yaitu semacam "wadah" atau "kolam" yang berisi lebih dari satu thread dengan jumlah tertentu. Threads tersebut akan mengambil masing-masing satu "tugas" ketika sedang "menganggur". Setiap kali suatu thread selesai mengerjakan suatu tugas, thread tersebut akan kembali "menganggur" dan siap menerima tugas berikutnya. Multithreaded server ini dapat dimanfaatkan untuk meng-handle beberapa request dalam satu waktu yang sama.
+
+<br>
+
+Dalam satu ThreadPool, terdapat beberapa `worker` dengan jumlah tertentu. Para `worker` inilah yang nantinya akan menerima tugas dan mengeksekusinya dalam suatu thread. Agar `ThreadPool` dapat berkomunikasi dengan `worker` untuk mengirimkan tugas, dibuatlah `channel` yang memiliki `sender` dan `receiver`. Selain itu, dibuat juga suatu _struct_ bernama `Job` yang digunakan untuk menyimpan data dari tugas yang akan dieksekusi. `ThreadPool` akan memiliki `sender` yang berisi "antrean" dari `Job`, dan `worker` memiliki `receiver` yang akan menerima kiriman `Job` tersebut.
+
+<br>
+
+Para `worker` menggunakan `Arc` untuk dapat "berbagi" receiver, dan masing-masing dari mereka menggunakan `mutex` untuk membatasi akses ke receiver ketika pengambilan `Job`. Setiap `worker` akan melakukan looping terhadap `receiver` untuk mencari `Job`. Ketika suatu `worker` mengambil suatu `Job`, worker tersebut akan menjalankan suatu thread, di mana thread tersebut akan mengunci receiver dengan menggunakan `lock()` untuk menerapkan _mutual exclusion_. Kemudian, `thread` tersebut akan mengambil `Job` menggunakan `recv()` dari channel untuk dieksekusi. Setelah itu, barulah receiver akan ter-unlock dan worker lain dapat kembali mengakses receiver untuk mencari `Job`.
