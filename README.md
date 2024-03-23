@@ -144,3 +144,32 @@ Berikut tampilan browser ketika program di-run dan path request invalid, misalny
 ![Commit 3 screen capture](/assets/images/commit3.png)
 
 ---
+
+### Commit 4 Reflection notes
+#### Simulating slow request
+
+Saat ini, server yang telah dibuat bersifat _single-threaded_. Jika server menerima lebih dari satu request, masing-masing request tersebut akan diproses secara berurutan. Suatu request hanya dapat diproses setelah request sebelumnya selesai diproses. Jika terdapat request yang perlu waktu lama untuk diproses, maka request berikutnya juga harus menunggu lama untuk diproses.
+
+<br>
+
+Kita akan mensimulasikan dampak dari adanya request yang _slow_. Bagian pengisian variabel `status_line` dan `filename` pada method `handle_connection` diubah menjadi sebagai berikut.
+
+<br>
+
+```rust
+    let (status_line, filename) = match &request_line[..] {
+        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "hello.html"),
+        "GET /sleep HTTP/1.1" => {
+            thread::sleep(Duration::from_secs(5));
+            ("HTTP/1.1 200 OK", "hello.html")
+        }
+        _ => ("HTTP/1.1 404 NOT FOUND", "404.html"),
+    };
+```
+Validasi request kini menggunakan `match` untuk mencocokkan _pattern_ dari `request_line`. Kita menambahkan satu kasus validasi request, yaitu untuk path `/sleep`. Menggunakan `thread::sleep(Duration::from_secs(5));`, thread akan dijeda selama 5 detik sebelum me-set variabel `status_line` dan `filename` sehingga pengiriman response untuk path `/sleep` juga akan terjeda 5 detik.
+
+<br>
+
+Simulasi dilakukan dengan membuka dua tab, satunya untuk path `/` dan yang satunya lagi untuk path `/sleep`. Ketika browser hanya me-load tab dengan path `/`, tab tersebut dapat di-load dengan sangat cepat. Tetapi, ketika me-load tab dengan path `/sleep`, browser membutuhkan waktu 5 detik sebelum memunculkan `hello.html`. Ketika tab `/sleep` di-load terlebih dahulu, kemudian tab `/` ikut di-load sebelum tab `/sleep` menyelesaikan load nya, tab `/` harus menunggu sampai tab `/sleep` menyelesaikan load nya yang berdurasi 5 detik. Akibat tab `/sleep` yang lebih _slow_ dibanding tab `/`, loading untuk tab `/` ikut terpengaruh dan terjeda. Simulasi ini menunjukkan bahwa pemrosesan pada _single-threaded server_ kurang efisien dan akan sangat memakan waktu ketika diakses oleh banyak client.
+
+---
